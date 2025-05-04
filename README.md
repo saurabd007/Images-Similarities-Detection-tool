@@ -48,7 +48,7 @@ Try the live demo: [Image Similarity Tool Demo](https://your-github-username.git
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-github-username/image-similarity-tool.git
+git clone https://github.com/saurabd007/Images-Similarities-Detection-tool.git
 cd image-similarity-tool
 ```
 

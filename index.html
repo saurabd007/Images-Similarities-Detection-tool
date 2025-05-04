@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Similarity Comparison Tool</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.4/babel.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <style>
+    .lucide {
+      width: 1em;
+      height: 1em;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Icons from Lucide
+    const Upload = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" className="lucide lucide-upload" viewBox="0 0 24 24">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+    );
+
+    const Camera = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" className="lucide lucide-camera" viewBox="0 0 24 24">
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+        <circle cx="12" cy="13" r="3"></circle>
+      </svg>
+    );
+
+    function ImageSimilarityComparison() {
+      const [image1, setImage1] = React.useState(null);
+      const [image2, setImage2] = React.useState(null);
+      const [similarity, setSimilarity] = React.useState(null);
+      const [processing, setProcessing] = React.useState(false);
+      const [error, setError] = React.useState(null);
+
+      // Function to handle image uploads
+      const handleImageUpload = (e, imageNumber) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.match('image.*')) {
+          setError('Please select an image file');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const setImageFn = imageNumber === 1 ? setImage1 : setImage2;
+            setImageFn({
+              src: e.target.result,
+              width: img.width,
+              height: img.height,
+              element: img
+            });
+            setError(null);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+
+      // Function to compute the similarity
+      const computeSimilarity = React.useCallback(() => {
+        if (!image1 || !image2) {
+          setError('Please upload both images');
+          return;
+        }
+
+        setProcessing(true);
+        
+        // Create canvases for both images with normalized dimensions
+        const size = 64; // Reduced size for performance
+        const canvas1 = document.createElement('canvas');
+        const canvas2 = document.createElement('canvas');
+        canvas1.width = canvas2.width = size;
+        canvas1.height = canvas2.height = size;
+        
+        const ctx1 = canvas1.getContext('2d');
+        const ctx2 = canvas2.getContext('2d');
+        
+        // Draw images on canvases with same dimensions for comparison
+        ctx1.drawImage(image1.element, 0, 0, size, size);
+        ctx2.drawImage(image2.element, 0, 0, size, size);
+        
+        // Get pixel data
+        const data1 = ctx1.getImageData(0, 0, size, size).data;
+        const data2 = ctx2.getImageData(0, 0, size, size).data;
+        
+        // Compare pixel data and calculate similarity
+        let matchingPixels = 0;
+        let totalPixels = size * size;
+        let diffThreshold = 30; // Threshold for considering pixels different
+        
+        for (let i = 0; i < data1.length; i += 4) {
+          const r1 = data1[i];
+          const g1 = data1[i + 1];
+          const b1 = data1[i + 2];
+          
+          const r2 = data2[i];
+          const g2 = data2[i + 1];
+          const b2 = data2[i + 2];
+          
+          // Calculate color difference using simple Euclidean distance
+          const colorDiff = Math.sqrt(
+            Math.pow(r1 - r2, 2) + 
+            Math.pow(g1 - g2, 2) + 
+            Math.pow(b1 - b2, 2)
+          );
+          
+          if (colorDiff < diffThreshold) {
+            matchingPixels++;
+          }
+        }
+        
+        const similarityValue = (matchingPixels / totalPixels) * 100;
+        setSimilarity(similarityValue.toFixed(2));
+        setProcessing(false);
+      }, [image1, image2]);
+
+      // Automatically compute similarity when both images are loaded
+      React.useEffect(() => {
+        if (image1 && image2) {
+          computeSimilarity();
+        }
+      }, [image1, image2, computeSimilarity]);
+
+      // Function to generate a visual difference map
+      const generateDiffMap = () => {
+        if (!image1 || !image2) return null;
+        
+        const size = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw first image
+        ctx.drawImage(image1.element, 0, 0, size, size);
+        
+        // Get first image data
+        const imageData1 = ctx.getImageData(0, 0, size, size);
+        
+        // Draw second image
+        ctx.drawImage(image2.element, 0, 0, size, size);
+        
+        // Get second image data
+        const imageData2 = ctx.getImageData(0, 0, size, size);
+        
+        // Create difference map
+        const diffData = ctx.createImageData(size, size);
+        
+        for (let i = 0; i < imageData1.data.length; i += 4) {
+          const r1 = imageData1.data[i];
+          const g1 = imageData1.data[i + 1];
+          const b1 = imageData1.data[i + 2];
+          
+          const r2 = imageData2.data[i];
+          const g2 = imageData2.data[i + 1];
+          const b2 = imageData2.data[i + 2];
+          
+          const diff = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+          
+          // Highlight areas with differences
+          if (diff > 30) {
+            diffData.data[i] = 255;   // R
+            diffData.data[i+1] = 0;   // G
+            diffData.data[i+2] = 0;   // B
+            diffData.data[i+3] = 255; // Alpha
+          } else {
+            diffData.data[i] = (r1 + r2) / 2;
+            diffData.data[i+1] = (g1 + g2) / 2;
+            diffData.data[i+2] = (b1 + b2) / 2;
+            diffData.data[i+3] = 255;
+          }
+        }
+        
+        ctx.putImageData(diffData, 0, 0);
+        return canvas.toDataURL();
+      };
+
+      const diffMapSrc = image1 && image2 ? generateDiffMap() : null;
+
+      return (
+        <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-6 space-y-8 bg-gray-50 rounded-lg shadow">
+          <h1 className="text-2xl font-bold text-center text-gray-800">Image Similarity Comparison Tool</h1>
+          
+          {error && (
+            <div className="w-full p-4 bg-red-50 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+          
+          <div className="flex flex-wrap w-full justify-around gap-4">
+            {/* Image 1 Upload */}
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-64 h-64 border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden relative">
+                {image1 ? (
+                  <img 
+                    src={image1.src} 
+                    alt="First uploaded image" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center p-4 text-gray-500">
+                    <Camera />
+                    <p className="mt-2">Upload first image</p>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                id="image1"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageUpload(e, 1)}
+              />
+              <label
+                htmlFor="image1"
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 transition-colors"
+              >
+                <Upload />
+                <span className="ml-2">{image1 ? 'Change Image 1' : 'Upload Image 1'}</span>
+              </label>
+            </div>
+            
+            {/* Image 2 Upload */}
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-64 h-64 border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden relative">
+                {image2 ? (
+                  <img 
+                    src={image2.src} 
+                    alt="Second uploaded image" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center p-4 text-gray-500">
+                    <Camera />
+                    <p className="mt-2">Upload second image</p>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                id="image2"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageUpload(e, 2)}
+              />
+              <label
+                htmlFor="image2"
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 transition-colors"
+              >
+                <Upload />
+                <span className="ml-2">{image2 ? 'Change Image 2' : 'Upload Image 2'}</span>
+              </label>
+            </div>
+          </div>
+          
+          {/* Results Section */}
+          {processing ? (
+            <div className="w-full mt-8 p-6 bg-white rounded-lg shadow-md text-center">
+              <p className="text-lg">Processing images...</p>
+            </div>
+          ) : similarity !== null ? (
+            <div className="w-full mt-8 p-6 bg-white rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold mb-4 text-center">Similarity Analysis Results</h2>
+              
+              <div className="flex flex-col items-center mb-6">
+                <div className="relative w-64 h-8 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`absolute left-0 h-full rounded-full ${
+                      similarity > 80 ? 'bg-green-500' : 
+                      similarity > 50 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${similarity}%` }}
+                  ></div>
+                </div>
+                <p className="mt-2 text-2xl font-bold">
+                  {similarity}% Similar
+                </p>
+              </div>
+              
+              {diffMapSrc && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-medium mb-2 text-center">Difference Visualization</h3>
+                  <div className="flex justify-center">
+                    <div className="w-64 h-64 border border-gray-300 rounded-lg overflow-hidden">
+                      <img 
+                        src={diffMapSrc} 
+                        alt="Difference map" 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2 text-center">
+                    Red areas highlight differences between the images
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (image1 || image2) && (
+            <p className="text-gray-600">Upload both images to see similarity results</p>
+          )}
+          
+          <div className="w-full mt-4 text-sm text-gray-600 bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-medium mb-2">How it works:</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>The tool compares images pixel by pixel after normalizing their sizes</li>
+              <li>Colors are compared using RGB color distance calculation</li>
+              <li>The similarity percentage represents how many pixels match between the images</li>
+              <li>The difference map highlights areas that are different between the two images</li>
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ImageSimilarityComparison />, document.getElementById('root'));
+  </script>
+</body>
+</html>

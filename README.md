@@ -1,9 +1,7 @@
 # Image Similarity Comparison Tool
- # Image Similarity Comparison Tool
-
 A lightweight, browser-based tool that analyzes and quantifies the similarity between two images, providing both numerical similarity scores and visual difference mapping.
 
-![Image Similarity Comparison Tool](https://api.placeholder.com/800/400)
+Here You Can Access the website https://saurabd007.github.io/Images-Similarities-Detection-tool/
 
 ## Features
 
